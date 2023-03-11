@@ -1,0 +1,15 @@
+SOLID 원칙
+  SRP : 단일 책임 원칙(single responsibility principle)
+  OCP : 개방-패쇄 원칙 (Open/closed principle)
+  LSP : 리스코프 치환 원칙 (Liskov subsitiution principle)
+  ISP : 인터페이스 분리 원칙 (Interface segregation principle)
+  DIP : 의존관계 역전 원칙 (Dependency inversion principle)
+
+
+SRP 단일 책임 원칙 (single responsibility principle)
+  한 클래스는 하나의 책임만 가져야 한다.
+  하나의 책임라는 것은 모호하다.
+    클 수 있고, 작을 수 있다.
+    문맥과 상황에 따라 다르다.
+  중요한 기준은 볁
+  
