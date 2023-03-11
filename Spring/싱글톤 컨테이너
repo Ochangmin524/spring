@@ -119,7 +119,7 @@
 
     public void order (String name, int price) {
       System.out.println("name = " + name + " prive = " + price);
-      this.price = price;
+      this.price = price; //여기가 문제!
       }
 
     public int getPrice(){
@@ -127,11 +127,128 @@
     }
   }
   
+ 
+ @Test 
+ void statefulServiceSingleton() {
+ ApplicationContext ac = enw AnnotationConfigAplicationContext(TestConfig.class);
+ StatefulService statefulService1 = ac.getBean("statefulService", StatefulService.class);
+ StatefulService statefulService2 = ac.getBean("statefulService", StatefulService.class);
+ 
+ //ThreadA : A사용자 10000원 주문 
+ statefulService1.order("userA", 10000);
+ //ThreadB : B사용자 20000원 주문
+ statefulService2.order("userB", 20000);
+ 
+ //ThreadA : 사용자A 주문 금액 조회
+ int price = statefulService1.getPrice();
+ //ThreadA : 사용자A는 10000원을 기대했지만, 기대와 다르게 20000원 출력
+ System.out.println("price = " + price);
+ 
+ Asserstions.assertThat(statefulService1.getPrice()).isEqualTo(20000);
+ }
+ 
+ 
+ 
+ static class TestConfig {
+  @Bean
+  public StatefulService statefulService() {
+    return new StatefulService();
+    
+    }
+  }
+
+  
+ 
+ 
+ ThreadA가 사용자A 코드를 호출하고, ThreadB가 사용자B 코드를 호출한다 가정하자.
+ statefulService의 price 필드는 공유되는 필드인데, 특정 클라이언트가 값을 변경한다.
+ 사용자A의 주문금액은 10000원이 되어야 하는데, 20000원이라는 결과가 나왔다.
+ 실무에서 이런 경우를 종종 보는데, 이로인해 정말 해결하기 어려운 큰 문제들이 터진다.
+ 진짜 공유 필드는 조심해야 한다. 스프링 빈은 항상 무상태(stateless)로 설계하자.
+ 
+ 
+ stateful로 생성된 price는 하나만 생성되어서 A와 B가 접근할 때 마다 바뀌어서 A 도 B의 가격으로 보이게 된 것이다
+ 
+ 
+ 
+ @Configuration과 싱글톤
+ AppConfig 코드를 보자.
+ 
+  @Configuration
+  public class AppConfig {
+    @Bean
+    public MemberService memberService() {
+     return new MemberServiceImpl(memberRepository()); //여기서 MemoryMemberRepository 생성!
+    }
+    @Bean
+    public OrderService orderService() {
+     return new OrderServiceImpl(
+      memberRepository(), // 여기서도 MemoryMemberRepository 생성!
+      discountPolicy());
+  }
+ 
+    @Bean
+    public MemberRepository memberRepository() {
+      return new MemoryMemberRepository();  
+  }
+  ...
+}
+
+  결과적으로 각각 다른 2개의 MemoryMemberRepository가 생성되면서 싱글톤이 깨지는 것으로 보인다.
+  하지만 실재로 확인해 보면 하나의 인스턴스를 공유되어 사용된다.
+
+  
+@Configuration과 바이트코드 조작의 마법
+  스프링 컨테이너는 싱글톤 레지스트리다. 따라서 스프링 빈이 싱글톤이 되도록 보장해주어야 한다.
+  그래서 스프링은 클래스의 바이트코드를 조작하는 라이브러리르 사용한다.
+  모든 비밀은 @Configuration을 적용한 AppConfig에 있다.
+  
+  
+  사실 스프링 컨테이너를 생성하는 ApplicationContext ac = new AnnotationConfigApplicationContext(AppConfig.class);
+  에 파라미터로 넘긴 Appconfig는 스프링 빈으로 등록된다. 
+  
+  이때 Appconfig 의 클래스 정보를 출력해보면 
+  에상되는 class hello.core.Appconfig 와 달리
+  class hello.core.AppConfig$$EnhancerBySpringCGLIB$$bd479d70로 클래스 명에 xxxCGLIB이 붙으면서 상당히 복잡해진다.
+  
+  이는 내가 만든 Appconfig 가 아닌 스프링이 CGLIB이라는 바이트코드 조작 라이브러리를 이용하여 
+  Appconfig 클래스를 상속받은 임의의 다른 클래스를 만들고, 그 다른 클래스를 스프링으로 등록한 것이다.
+  
+  AppConfig <- AppConfig@CGLIB (이 클래스가 빈으로 등록)
+  
+  이 임의의 클래스가 바로 싱글톤이 보장되도록 한다.
+  아마 이 클래스는 바이트 코드를 조작하여 작성되어 있을 것이다. (실제로는 CGLIB의 내부 기술을 사용하는데 매우 복잡하다)
+  
+  AppConfig@CGLIB 예상 코드
+  
+  @Bean
+  public MemberRepository memberReposity() {
+    if (memoryMEmberRepository가 이미 스프링 컨테이너에 등록되어 있으면) {
+      return 스프링 컨테이너에서 찾아서 반환; (기존에 생성한 인스턴스를 공유하여 사용)
+    } else { // 스프링 컨테이너에 없으면
+        기존 로직을 호출해서 MemoryMemberRepository를 생성하고 스프링 컨테이너에 등록 (없기에 새로 생성)
+        return 반환
+    }
+  }
+  
+  @Bean이 붙은 메서드마다 이미 스프링 빈이 존재하면 존재하는 빈을 반환하고, 스프링 빈이 없으면 
+  생성해서 스프링 빈으로 등록하여 반한하는 코드가 동적으로 만들어진다.
+  
+  덕분에 싱글톤이 보장되는 것이다.
+  
+  참고 : AppConfig@CGLIB는 AppConfig의 자식 타입이므로, AppConfig 타입으로 조회 할 수 있다.
   
   
   
+  Appconfig에 @Configuration이 아닌 @Bean만 적용하면 싱글톤이 보장되지 않으며, MemoryMemberRepository가 여러개 생성된다.
   
   
+  정리 
+  @Bean만 사용해도 스프링 빈으로 등록되지만, 싱글톤을 보장하지 않는다.
+    memberRepository()처럼 의존관계 주입이 필요해서 메서드를 직접 호출할 때 싱글톤을 보장하지 않는다.
+  
+  크게 고민할 것 없다. 스프링 설정 정보는 항상 @Configuration을 사용하자!!!
+     
 
 
   
