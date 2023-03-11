@@ -7,3 +7,13 @@
   자바 코드를 읽어서 BeanDefinition을 만들면 된다.
   스프링 컨테이너는 자바 코드인지, XML인지 몰라도 된다. 오직 BeanDefintion만 알면 된다.
   
+  
+스프링 컨테이너 -> BeanDefinition
+
+appConfig.class -> BeanDefinition
+
+appConfig.xml -> BeanDefinition
+
+appConfig.xxx -> BeanDefinition
+
+
