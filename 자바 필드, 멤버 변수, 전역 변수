@@ -1,0 +1,18 @@
+public class FieldExample {
+  int i = 10; // Field, 전역 변수 (global variable), 멤버 변수(member variable)
+  
+  public void Method() {
+    int j = 10; // 지역 변수(local variable)
+    
+  }
+}
+
+자바에서 필드는 클래스 안에 있는 변수(variable)이다.
+즉 필드는 클래스 영역 안에 있는 변수
+
+따라서
+
+
+필드, 전역 변수(global variable), 멤버 변수(member variable) = 클래스 영역에 정의한 변수
+
+지역 변수(local variable) : 메소드 안에 있는 변수
