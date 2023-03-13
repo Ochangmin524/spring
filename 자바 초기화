@@ -1,0 +1,34 @@
+자바에서 초기화(initialization)이란 객체를 선언하고 값을 '최초'로 할당하는 것이다.
+
+
+초기화는 생성자(Constructor)에서 변수 값 주는 게 초기화인가?
+
+public class InitializationTest {
+  public static void main(String[] args) {
+    int a; //여기서 값을 할당하지 않았으므로 에러 발생
+    System.out.println(a);
+  }
+}
+
+
+
+public class InitializationTest {
+  int a;
+  String b;
+  Boolean c;
+  
+  public static void main(String[] args) {
+    InitiailizationTest it = new InitializationTest();
+    System.out.println(it.a);
+    System.out.println(it.b);
+    System.out.println(it.c);
+
+이 경우에는 에러가 발생하지 않는다.
+
+이는 컴파일러에서 자동으로 0, null, null의 값을 할당해 주었기 때문이다.
+
+
+그러나 메소드 안에서는
+자동으로 값 할당이 되지 않기 때문에
+에러가 발생한다.
+
