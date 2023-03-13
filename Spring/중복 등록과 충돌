@@ -29,3 +29,144 @@
   
   스프링 부트인 CoreApplication을 실행해보면 오류를 볼 수 있다. 
   
+  
+  
+  
+  
+
+같은 타입의 하위 타입의 빈이 여러개면 어떻게 해야 할까?
+
+  조회 빈이 2개 이상 - 문제
+
+    @Autowired는 타입(Type)으로 조회한다.
+
+    타입으로 조회하므로 선택된 빈이 2개 이상일 때 문제가 발생한다.
+    DiscountPolicy의 하위 타입인 FixDiscountPolicy, RateDiscountPolicy 가 스프링 빈으로 등록된 경우 충돌이 발생한다.
+
+    이때 하위 타입으로 지정할 수 있지만 이는 DIP를 위배하며, 유연성이 떨어진다.
+
+
+
+
+    조회 빈이 2개 이상 - 해결책
+
+    1. @Autowired 필드 명 매칭
+    2. @Qualifer -> Qualifier 끼리 매칭 -> 빈 이름 매칭
+    3. @Primary 사용
+
+    1. @Autowired 필드 명 매칭
+      @Autowired는 타입 매칭을 시도하고, 이때 여러 빈이 있으면 필드 이름, 파라미터 이름으로 빈 이름을 추가 매칭한다.
+
+      @Autowired 
+      private DiscountPolicy discountPolicy
+
+      ->
+
+      @Autowired 
+      private DiscountPolicy rateDiscountPolicy // 타입은 같지만 변수명이 달라짐
+
+      이 경우 필드 명 (변수명)이 rateDiscountPolicy이므로 정상 주입된다.
+      필드 명 매칭은 먼저 타입 매칭을 시도 하고 그 결과에 여러 빈이 있을 때 추가로 동작한다.
+
+      정리
+      1. 타입 매칭
+      2. 타입 매칭의 결과각 2개 이상일 때 필드 명, 파라미터 명으로 빈 이름 매칭
+
+
+
+
+
+
+
+
+    2. @Qualifer -> Qualifier 끼리 매칭 -> 빈 이름 매칭
+      @Qualifier는 추가 구분자를 붙여주는 방법이다. 주입시 추가적인 방법을 제공하는 것이지, 빈 이름을 변경하는 것은 아니다.
+
+
+
+      @Component
+      @Qualifier("mainDiscountPolicy")
+      public class RateDiscountPolicy implements DiscountPolicy {}
+
+
+
+      @Component
+      @Qualifier("fixDiscountPolicy")
+      public class FixDiscountPolicy implements DiscountPolicy {}
+
+
+
+
+      @Autowired
+      public OrderServiceImpl(MemberRepository memberRepository, 
+                              @Qualifier("mainDiscountPolicy") DiscountPolicy
+    discountPolicy) {
+
+              this.memberRepository = memberRepository;
+              this.discountPolicy = discountPolicy;
+      }
+
+
+
+
+      만약 @Qualifier로 주입할 때 @Qualifier("mainDiscoutPolicy") 를 못찾으면,
+      mainDiscountPolicy 라는 이름을 가진 스프링 빈을 추가로 찾는다.
+
+
+
+      정리
+      1. @Qualifier 끼리 매칭
+      2. 빈 이름 매칭
+      3. NoSuchBeanDefinitionException 예외 발생
+    
+      
+    
+    
+    
+    
+    
+    
+    3. @Primary 사용
+      @Primary는 우선순위를 정하는 방법이다. @Autowired 시에 여러 빈이 매칭되면 @Primary 우선권을 가진다.
+      
+      rateDiscountPolicy 가 우선권을 가지게 하자.
+      
+      @Component
+      @Primary
+      public class RateDiscountPolicy implements DiscountPolicy {}
+      
+      @Component
+      public class FixDiscountPolicy implements DiscountPolicy{}
+      
+      
+  
+  @Primary, @Qualifier 활용
+  
+    만약 주로 사용하는 메인 데이터베이스의 커넥션을 획득하는 스프링 빈이 있고,
+    특별한 기능에 가끔 사용되는 서브 데이터베이스의 커넥션을 획득하는 스프링 빈이 있다고 해보자.
+    
+    이런 경우
+    
+    메인 데이터에는 @Primary를 적용해서 조회하는 곳에서 @Qualifier 지정 없이 편리하게 조회하고,
+    서브 데이터에는 @Qualifier을 지정해서 명시적으로 획득하는 방식으로 사용하면 깔끔해진다.
+    
+    우선 순위
+    @Primary 는 기본값 처럼 동작하는 것이고, @Qualifier 는 매우 상세하게 동작한다. 이런 경우 어떤 것이
+    우선권을 가져갈까? 스프링은 자동보다는 수동이, 넒은 범위의 선택권 보다는 좁은 범위의 선택권이 우선
+    순위가 높다. 따라서 여기서도 @Qualifier 가 우선권이 높다.
+    
+      
+
+  
+    
+  
+  
+  
+  
+  
+  
+  
+  
+
+
+  
