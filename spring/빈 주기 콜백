@@ -1,0 +1,203 @@
+스프링 IoC 컨테이너는 Bean 객체들을 책임지고 의존성을 관리한다.
+
+
+객체를 관리한다는 것은 객체의 생성부터 소멸까지 생명주기(LifeCycle) 관리를 개발자가 아닌 컨테이너가 대신 해준다는 말이다.
+
+객체 관리의 주체가 프레임워크(Container)가 되기 때문에 개발자는 로직에 집중할 수 있다는 장점이 있다.
+
+
+
+빈 생명주기 콜백의 필요성
+
+  콜백은 주로 콜백함수를 부를 때 사용되는 용어이며, 콜백함수를 등록하면 특정 이벤트가 발생했을 때 해당 메소드가 호출된다.
+
+  즉, 조건에 따라 실행될 수도, 실행되지 않을 수도 있는 개념이라 보면 된다.
+
+
+  보통 프로젝트를 하다보면 DB연결, 네트워크 소켓 연결 등과 같이 시작 시점에 미리 연결한 뒤, 어플리케이션
+  종료 시점에 연결을 종료해야 하는 경우 객체의 초기화 및 종료 작업이 필요할 것이다.
+  (Ex 커넥션 풀의 connect & disconnect) 
+
+  스프링 빈도 같은 원리로 초기화 작업과 종료 작업이 나눠서 진행된다.
+
+  간단히 말해서 객체 생성 -> 의존관계 주입이라는 라이프사이클을 가진다.
+
+  즉, 스프링 빈은 의존관계 주입이 다 끝난 다음에야 필요한 데이터를 사용할 수 있는 준비가 완료된다.
+  
+  
+  
+그렇다면 개발자는 의존관게 주입이 모두 완료된 시점을 어떻게 알 수 있을까?
+  
+  스프링은 의존관계 주입이 완료되면 스프링 빈에게 콜백 메서드를 통해서 '초기화 시점'을 알려주는 다양한 기능을 제공한다. 
+
+
+  스프링은 스프링 컨테이너가 종료되기 직전에 소멸 콜백을 준다.
+
+
+
+
+스프링 '빈'의 이벤트 라이프 사이클
+   스프링 컨테이너 생성 ->
+   스프링 빈 생성 ->
+   의존관계 주입 ->
+   초기화 콜백 -> [초기화 콜백 : 빈이 생성되고, 빈의 의존관계가 주입이 완료된 후 호출]
+   사용 ->
+   소멸전 콜백 -> [빈이 소멸되기 직전에 호출]
+   스프링 종료
+   
+  
+  생성자 : 필수 정보(파라미터)를 받고, 메모리를 할당해서 객체를 생성하는 책임을 가진다.
+  
+  초기화 : 생성자를 통해 생성된 값을 활용해서 외부 커넥션을 연결하는 등의 무거운 동작을 수행한다.
+  
+  따라서 생성자 안에서 무거운 초기화 작업을 함께 하는 것 보다는 
+  '객체를 생성하는 부분'과 '초기화 하는 부분'을 명확하게 나누는 것이 유지보수 관점에서 좋다.
+  
+  
+  
+  
+스프링은 다양한 방식으로 생명주기 콜백을 지원한다.
+
+스프링은 크게 3가지 방법으로 빈 생명 주기 콜백을 지원한다.
+  1. 인터페이스(InitializingBean, DisposableBean)
+  2. 설정 정보에 초기화 메서드, 종료 메서드 지정
+  3. @Postconstruct, @PreDestroy 애노테이션 지원
+  
+  
+  
+  인터페이스 InitializingBean, DisposableBean
+  
+    public class .... implements InitializingBean, DisposableBean {
+      ...
+      
+      @Override
+      public void afterPropertiesSet() throws Exception {
+        connect();
+        ....
+        }
+        
+      @Override
+      public void destroy() throws Exception {
+        disConnect();
+        ...
+      }
+      
+    }
+    
+    
+    initializingBean은 afterPropertiesSet() 메서드로 초기화를 지원한다.
+    DispoableBean은 destroy() 메서드로 소멸을 지원한다.
+    
+    
+    초기화, 소멸 인터페이스 단점
+    
+    이 인터페이스는 스프링 전용 인터페이스 이다. 해당 코드가 스프링 전용 인터페이스에 의존한다.
+    
+    초기화, 소멸 메서드의 이름을 변경할 수 없다.
+    
+    내가 코드를 고칠 수 없는 외부 라이브러리에 적용할 수 없다.
+    
+    참고 : 스프링 초창기에 나온 방법이며, 지금은 거의 사용하지 않는다
+    
+    
+    
+    
+    
+    
+    
+  빈 등록 초기화, 소멸 메서드 지정
+    설정 정보에 @Bean(initMethod = "init", destroyMethod = "close") 처럼 초기화, 소멸 메서드르 지정할 수 있따.
+    
+    
+    설정정보 
+    @Configuration
+    static class LifeCycleConfig {
+      @Bean(initMethod = "init", destroyMethod = "close") 
+      // 참고로 @Bean의 destroyMethod는
+      close, shutdown이라는 메서드를 자동으로 종료 메서드로 추론해서 호출해준다. 따라서 close로 적어주지 않아도 잘 동작한다.
+      
+      public NetworkClient networkClient()//생성자 호출 {
+      
+      }
+    }
+    
+    
+    public class NetworkClient {
+      public NetworkClient() {
+        System.out.println("생성자 호출, rul = " + url);
+      }
+      
+      public void init() { // initMethod = "init" 으로 지정하므로 초기화 메서드
+      ...
+      }
+      
+      public void close() { // destroyMethod = "close"으로 지정하므로 소멸 메서드
+      ...
+      }
+    
+  설정 정보 사용 특징
+  메서드 이름을 자유롭게 줄 수 있다.
+  스프링 빈이 스프링 코드에 의존하지 않는다.
+  코드가 아니라 설정 정보를 사용하기 때문에 코드를 고칠 수 없는 외부 라이브러리에도 초기화, 종료 
+  메서드를 적용할 수 있다.
+  
+    
+    
+   
+   
+   
+   애노테이션 @PostConstruct, @PreDestroy
+   
+       
+    설정정보 
+    @Configuration
+    static class LifeCycleConfig {
+      @Bean
+      public NetworkClient networkClient()//생성자 호출 {
+        ...
+      }
+    }
+    
+    
+   
+   
+   
+   
+   
+   
+   
+   
+   public class NetworkClient {
+    ...
+    @PostConstruct
+    public void init() {
+     ...
+    }
+    
+    @PreDestroy
+    public void close() {
+     ...
+    }
+    
+    
+    
+    
+    @PostConstruct, @PreDestroy 두 애노테이션을 사용하면 가장 편리하게 초기화와 종료를 실행 할 수 있다.
+    
+    @PostConstruct, @PreDestroy 애노테이션 특징
+    최근 스프링에서 가장 권장하는 방법이다.
+    애노테이션 하나만 붙이면 되므로 매우 편하다
+    패키지를 보면 javax.annotation.PostConstruct이다. 이는 스프링에 종속된 것이 아닌 자바 표준이므로 스프링이 아닌
+    다른 컨테이너에서도 잘 동작한다.
+    컴포넌트 스캔과 잘 어울린다.
+    
+    
+    유일한 단점은 외부 라이브러리에는 적용하지 못하는 것이다.
+    외부 라이브러리를 초기화, 종료 하려면 @Bean 기능을 사용하자.
+
+
+
+  정리
+  @PostConstruct, @PreDestroy 애노테이션을 사용하자
+  코드를 고칠 수 없는 외부 라이브러리를 초기화, 종료 해야 하면 @Bean의 initMethod, destroyMethod를 사용하자.    
+    
